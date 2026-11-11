@@ -121,7 +121,6 @@
       .wrap { width: calc(100% - 26px); }
     }
   </style>
-  <script src="./data.js" defer></script>
 </head>
 <body>
   <header class="top">
@@ -139,7 +138,7 @@
           <h1 id="site-title">行政書士</h1>
           <p id="book-subtitle"></p>
           <div class="actions">
-            <button type="button" id="daily" class="btn primary">今日のランダム問題</button>
+            <button type="button" id="daily" class="btn primary" disabled>今日のランダム問題</button>
             <button type="button" id="resume" class="btn" hidden>続きから</button>
           </div>
         </div>
@@ -159,7 +158,7 @@
             <button class="btn primary">この分野で練習</button>
           </div>
         </form>
-        <p id="practice-notice" class="notice" role="status"></p>
+        <p id="practice-notice" class="notice" role="status">問題データを読み込み中です</p>
       </section>
       <section id="learning" class="home-section card" aria-labelledby="learning-title">
         <div class="section-head"><h2 id="learning-title">学習状況</h2><p>分野ごとの習熟度</p></div>
@@ -196,7 +195,7 @@
   </template>
   <script>
 "use strict";
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const fallbackConfig = {
   "bookName": "行政書士 オリジナル問題集",
   "bookStatus": "書籍は発刊準備中",
@@ -255,10 +254,18 @@ document.addEventListener("DOMContentLoaded", () => {
     ]
   ]
 };
-  const data = window.EXAM_DATA;
-  const CONFIG = data?.config?.storagePrefix === fallbackConfig.storagePrefix ? data.config : fallbackConfig;
+  const data = await loadData();
+  const book = isObject(data?.config) ? data.config : {};
+  // data.js が差し替えられても、試験情報・公式リンク・記録の保存先は生成時の設定を使う。
+  const CONFIG = {
+    ...fallbackConfig,
+    bookName: text(book.bookName).trim() || fallbackConfig.bookName,
+    bookStatus: text(book.bookStatus).trim() || fallbackConfig.bookStatus
+  };
   const $ = (id) => document.getElementById(id);
-  const emptyMessage = "問題は順次追加中です";
+  const emptyMessage = data ? "問題は順次追加中です" : "問題データを読み込めませんでした。ページを再読み込みしてください。";
+  const sessionVersion = 1;
+  const storagePrefix = CONFIG.storagePrefix + "v1:";
   const modes = new Map([
     ["random-choice", { title: "ランダム・択一", description: "全分野から、選択肢を選んで解く。" }],
     ["random-ichi", { title: "ランダム・一問一答", description: "全分野から、記述の正誤を答える。", ichi: true }],
@@ -272,18 +279,31 @@ document.addEventListener("DOMContentLoaded", () => {
     read(key) {
       if (memory.has(key)) return memory.get(key);
       try {
-        return JSON.parse(localStorage.getItem(CONFIG.storagePrefix + "v1:" + key));
+        const raw = localStorage.getItem(storagePrefix + key);
+        if (raw === null) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed === null) this.remove(key);
+        return parsed;
       } catch {
+        this.remove(key);
         return null;
       }
     },
     write(key, value) {
       try {
-        localStorage.setItem(CONFIG.storagePrefix + "v1:" + key, JSON.stringify(value));
+        localStorage.setItem(storagePrefix + key, JSON.stringify(value));
         memory.delete(key);
       } catch {
         memory.set(key, structuredClone(value));
         $("storage-status").textContent = "このブラウザーでは学習記録を保存できません。";
+      }
+    },
+    remove(key) {
+      memory.delete(key);
+      try {
+        localStorage.removeItem(storagePrefix + key);
+      } catch {
+        // 保存領域にアクセスできなくても練習を続けられる。
       }
     }
   };
@@ -302,6 +322,44 @@ document.addEventListener("DOMContentLoaded", () => {
     element.type = "button";
     element.addEventListener("click", action);
     return element;
+  }
+
+  function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function text(value) {
+    return typeof value === "string" ? value : "";
+  }
+
+  function numberOrText(value) {
+    return Number.isFinite(value) ? value : text(value) || undefined;
+  }
+
+  function decimalInteger(value) {
+    if (typeof value === "number") return value;
+    return typeof value === "string" && /^\d+$/.test(value.trim()) ? Number(value) : NaN;
+  }
+
+  async function loadData() {
+    try {
+      const response = await fetch("./data.js", {
+        mode: "same-origin", credentials: "omit", redirect: "error"
+      });
+      if (!response.ok) return null;
+      let source = (await response.text()).trim();
+      const marker = "// Generated empty data by node template/build.mjs";
+      if (source.startsWith(marker + "\n") || source.startsWith(marker + "\r\n")) {
+        source = source.slice(marker.length).trimStart();
+      }
+      // 従来の window.EXAM_DATA 形式は外枠だけ除き、中身は厳密に JSON として読む。
+      const legacy = /^window\.EXAM_DATA\s*=\s*/.exec(source);
+      if (legacy) source = source.slice(legacy[0].length).replace(/;\s*$/, "");
+      const parsed = JSON.parse(source);
+      return isObject(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
   }
 
   function list(value) {
@@ -345,18 +403,29 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadQuestions() {
     function add(raw, setTitle) {
       const id = raw?.id;
-      if ((typeof id !== "string" && typeof id !== "number") || id === "") return;
+      if ((typeof id !== "string" && !Number.isSafeInteger(id)) || id === "") return;
       if (questions.has(String(id)) || typeof raw.question !== "string") return;
       const options = list(raw.options);
       if (options.length < 2 || !options.every((option) => typeof option === "string")) return;
-      const answer = Number(raw.answer);
-      if (!Number.isInteger(answer) || answer < 1 || answer > options.length) return;
-      const explanation = raw.explanation || {};
-      const notes = new Map(list(explanation.options).filter(Boolean).map((option) => [Number(option.no), option]));
+      const answer = decimalInteger(raw.answer);
+      if (!Number.isSafeInteger(answer) || answer < 1 || answer > options.length) return;
+      const explanation = {
+        summary: text(raw.explanation?.summary),
+        legal_basis: list(raw.explanation?.legal_basis).filter((entry) => typeof entry === "string")
+      };
+      const notes = new Map();
+      for (const option of list(raw.explanation?.options)) {
+        const no = decimalInteger(option?.no);
+        if (!Number.isSafeInteger(no) || no < 1 || no > options.length) continue;
+        notes.set(no, {
+          correct: option.correct, text: text(option.text),
+          wrong_part: text(option.wrong_part) || text(option.wrongPart), reason: text(option.reason)
+        });
+      }
       questions.set(String(id), {
-        id: String(id), field: String(raw.field ?? ""), fieldName: raw.field_name,
-        stem: raw.question, options, answer, explanation, notes, setTitle, theme: raw.theme,
-        difficulty: raw.difficulty, publishedRate: raw.correct_rate
+        id: String(id), field: String(numberOrText(raw.field) ?? ""), fieldName: text(raw.field_name),
+        stem: raw.question, options, answer, explanation, notes, setTitle: text(setTitle), theme: text(raw.theme),
+        difficulty: numberOrText(raw.difficulty), publishedRate: numberOrText(raw.correct_rate)
       });
     }
     for (const set of list(data?.sets)) {
@@ -377,14 +446,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function record(id) {
-    return storage.read("answer:" + id);
+    const key = "answer:" + id;
+    const saved = storage.read(key);
+    if (saved === null) return null;
+    const attempts = decimalInteger(saved?.attempts);
+    const correct = decimalInteger(saved?.correct);
+    const lastCorrect = saved?.lastCorrect;
+    if (!Number.isSafeInteger(attempts) || attempts < 1 ||
+        !Number.isSafeInteger(correct) || correct < 0 || correct > attempts ||
+        typeof lastCorrect !== "boolean" || (lastCorrect ? correct === 0 : correct === attempts)) {
+      storage.remove(key);
+      return null;
+    }
+    return { attempts, correct, lastCorrect };
   }
 
   function saveAnswer(id, correct) {
     const old = record(id);
+    if (old?.attempts === Number.MAX_SAFE_INTEGER) return;
     storage.write("answer:" + id, {
-      attempts: (old?.attempts || 0) + 1,
-      correct: (old?.correct || 0) + Number(correct),
+      attempts: (old?.attempts ?? 0) + 1,
+      correct: (old?.correct ?? 0) + Number(correct),
       lastCorrect: correct
     });
   }
@@ -396,7 +478,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!stat) continue;
       stat.total++;
       const answer = record(question.id);
-      if (!answer?.attempts) continue;
+      if (!answer) continue;
       stat.answered++;
       stat.correct += Number(answer.lastCorrect);
     }
@@ -501,28 +583,75 @@ document.addEventListener("DOMContentLoaded", () => {
     return "session:" + mode + (field ? ":" + field : "");
   }
 
-  function currentSession(key) {
-    if (!key) return null;
-    const session = storage.read(key);
-    if (!Array.isArray(session?.items) || !Number.isInteger(session.position) ||
-        session.position < 0 || session.position >= session.items.length) return null;
-    if (session.mode === "daily" && session.date !== localDay()) return null;
-    const remaining = session.items.slice(session.position);
-    if (remaining.some((item) => {
+  function validSession(session, mode, field) {
+    if (!isObject(session) || session.mode !== mode || session.field !== field) return false;
+    // 初版にはバージョンがない。以降は読み取れる形式を明示して扱う。
+    if (session.version !== undefined && session.version !== sessionVersion) return false;
+    const { items, position, correct, result } = session;
+    if (!Array.isArray(items) || !items.length || items.length > questions.size ||
+        !Number.isSafeInteger(position) || position < 0 || position > items.length ||
+        !Number.isSafeInteger(correct) || correct < 0) return false;
+    if (mode === "daily" ? items.length !== 1 || session.date !== localDay() : session.date !== null) return false;
+
+    const seen = new Set();
+    const ichi = modes.get(mode)?.ichi === true;
+    for (const item of items) {
       const question = questions.get(item?.id);
-      return !question || (item.option != null && !statementOptions(question).includes(item.option));
-    })) return null;
-    return session;
+      if (!isObject(item) || !question || seen.has(item.id) || (field && question.field !== field)) return false;
+      if (ichi ? !statementOptions(question).includes(item.option) : item.option != null) return false;
+      seen.add(item.id);
+    }
+
+    if (result === null) return correct <= position;
+    if (position === items.length || !isObject(result) || typeof result.correct !== "boolean" ||
+        !Array.isArray(result.order)) return false;
+    const item = items[position];
+    const question = questions.get(item.id);
+    const choices = ichi ? [true, false] : question.options.map((_, index) => index + 1);
+    if (result.order.length !== choices.length) return false;
+    const order = new Set(result.order);
+    if (order.size !== choices.length || !choices.every((choice) => order.has(choice)) || !order.has(result.value)) return false;
+    const expected = ichi ? question.notes.get(item.option).correct : question.answer;
+    const currentCorrect = Number(result.correct);
+    return result.correct === (result.value === expected) && correct >= currentCorrect &&
+      correct - currentCorrect <= position;
+  }
+
+  function currentSession(mode, field = "") {
+    const key = sessionKey(mode, field);
+    const session = storage.read(key);
+    if (session === null) return null;
+    if (!validSession(session, mode, field)) {
+      storage.remove(key);
+      return null;
+    }
+    return { ...session, version: sessionVersion };
+  }
+
+  function resumeSession() {
+    const key = storage.read("resume");
+    if (key === null) return null;
+    if (typeof key === "string") {
+      const [, mode, field = ""] = key.split(":");
+      const validMode = mode === "daily" || modes.has(mode);
+      const validField = modes.get(mode)?.field ? fields.has(field) : field === "";
+      if (validMode && validField && key === sessionKey(mode, field)) {
+        const session = currentSession(mode, field);
+        if (session && session.position < session.items.length) return { key, session };
+      }
+    }
+    storage.remove("resume");
+    return null;
   }
 
   function createSession(mode, field, items, date = null) {
-    return { mode, field, items, date, position: 0, correct: 0, result: null };
+    return { version: sessionVersion, mode, field, items, date, position: 0, correct: 0, result: null };
   }
 
   function start(mode, field = "") {
     const key = sessionKey(mode, field);
-    const previous = currentSession(key);
-    if (previous) {
+    const previous = currentSession(mode, field);
+    if (previous && previous.position < previous.items.length) {
       openSession(key, previous);
       return;
     }
@@ -540,17 +669,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function dailyQuestion() {
+    const key = sessionKey("daily");
+    const existing = currentSession("daily");
+    if (existing) {
+      openSession(key, existing);
+      return;
+    }
     if (!questions.size) {
       notice(emptyMessage, true);
       return;
     }
     const date = localDay();
-    const key = sessionKey("daily");
-    const existing = storage.read(key);
-    if (existing?.date === date && questions.has(existing.items?.[0]?.id)) {
-      openSession(key, existing);
-      return;
-    }
     // 日付変更は日本時間の午前0時。
     let hash = 2166136261;
     for (const letter of CONFIG.storagePrefix + date) hash = Math.imul(hash ^ letter.charCodeAt(0), 16777619);
@@ -584,10 +713,10 @@ document.addEventListener("DOMContentLoaded", () => {
     $("home-nav").hidden = false;
     examSchedule();
     renderStats();
-    const session = currentSession(storage.read("resume"));
+    const saved = resumeSession();
     const resume = $("resume");
-    resume.hidden = !session;
-    if (session) resume.textContent = "続きから · " + modeTitle(session);
+    resume.hidden = !saved;
+    if (saved) resume.textContent = "続きから · " + modeTitle(saved.session);
   }
 
   function makeExplanation(question, item, result) {
@@ -615,8 +744,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ? "選択肢 " + (index + 1) + "（元の肢 " + no + (no === question.answer ? "・正解" : "") + "）"
         : "解説";
       line.append(node("strong", label));
-      const wrongPart = note.wrong_part ?? note.wrongPart;
-      if (wrongPart) line.append(node("p", "×箇所　" + wrongPart, "explanation-text"));
+      if (note.wrong_part) line.append(node("p", "×箇所　" + note.wrong_part, "explanation-text"));
       if (note.reason) line.append(node("p", "×理由　" + note.reason, "explanation-text"));
       if (note.text) line.append(node("p", note.text, "explanation-text"));
       notes.append(line);
@@ -662,7 +790,7 @@ document.addEventListener("DOMContentLoaded", () => {
     progress.value = session.position + Number(Boolean(result));
     progress.setAttribute("aria-label", "練習の進捗");
     const saved = record(question.id);
-    const rate = saved?.attempts ? Math.round(saved.correct / saved.attempts * 100) + "%" : "未解答";
+    const rate = saved ? Math.round(saved.correct / saved.attempts * 100) + "%" : "未解答";
     const meta = node("div", "", "quiz-meta");
     const labels = [
       (session.position + 1) + " / " + session.items.length + " 問",
@@ -725,9 +853,16 @@ document.addEventListener("DOMContentLoaded", () => {
   $("exam-name").textContent = CONFIG.examName;
   $("pass-line").textContent = CONFIG.passLine ?? "合格基準は未確認";
   for (const [label, url] of CONFIG.sources) {
+    let address;
+    try {
+      address = new URL(url);
+    } catch {
+      continue;
+    }
+    if (address.protocol !== "https:") continue;
     const entry = node("li");
     const link = node("a", label);
-    link.href = url;
+    link.href = address.href;
     entry.append(link);
     $("sources").append(entry);
   }
@@ -749,10 +884,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (selectedMode) start(selectedMode, $("field").value);
   });
   $("daily").addEventListener("click", dailyQuestion);
+  $("daily").disabled = false;
   $("resume").addEventListener("click", () => {
-    const key = storage.read("resume");
-    const session = currentSession(key);
-    if (session) openSession(key, session);
+    const saved = resumeSession();
+    if (saved) openSession(saved.key, saved.session);
     else showHome();
   });
   $("home-link").addEventListener("click", (event) => {

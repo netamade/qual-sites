@@ -2,4 +2,9 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-+az9txeyPv7i/InkGzvGDqoB8MLWKsLZ/R4YKl61hzE='; style-src 'sha256-gPkREEQv7lh8vdW/cVJhHFupWcUNT12Kno2Ltl2V+Jg='; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; connect-src 'none'; font-src 'none'
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()
+  Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-6KP+Ka2mq66S+27DWRC8IxZ/UYnD8hu/HBy5pldJLp0='; style-src 'sha256-gPkREEQv7lh8vdW/cVJhHFupWcUNT12Kno2Ltl2V+Jg='; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+
+/data.js
+  Content-Type: application/json; charset=utf-8

@@ -6,7 +6,8 @@ const check = process.argv.includes("--check");
 const root = new URL("../", import.meta.url);
 const source = async (file) => (await readFile(new URL(file, import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 const [layout, engine] = await Promise.all([source("index.html"), source("engine.js")]);
-const emptyDataMarker = "// Generated empty data by node template/build.mjs";
+const emptyDataMarker = "qual-sites-empty-v1";
+const legacyEmptyData = /^\/\/ Generated empty data by node template\/build\.mjs\nwindow\.EXAM_DATA = ([\s\S]+);\n$/;
 const htmlText = (value) => value.replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[char]));
 const hash = (value) => "'sha256-" + createHash("sha256").update(value).digest("base64") + "'";
 let failed = false;
@@ -22,14 +23,17 @@ async function emit(file, expected, preserveData = false) {
   if (existing === expected) return;
   if (preserveData && existing != null) {
     // 問題を投入済みの data.js は、空データ生成の対象から外す。
-    const match = /^\/\/ Generated empty data by node template\/build\.mjs\nwindow\.EXAM_DATA = ([\s\S]+);\n$/.exec(existing);
+    const legacy = legacyEmptyData.exec(existing);
     let value;
     try {
-      if (match) value = JSON.parse(match[1]);
+      value = JSON.parse(legacy ? legacy[1] : existing);
     } catch {
-      // JSON 以外の JavaScript 形式で記述した問題データも保持する。
+      // 手書きのファイルは生成処理では書き換えない。
+      return;
     }
-    if (!Array.isArray(value?.sets) || value.sets.length || !Array.isArray(value.questions) || value.questions.length) return;
+    if ((!legacy && value?._generatedBy !== emptyDataMarker) ||
+        !Array.isArray(value?.sets) || value.sets.length ||
+        !Array.isArray(value.questions) || value.questions.length) return;
   }
   if (check) {
     failed = true;
@@ -64,11 +68,21 @@ for (const [slug, settings] of Object.entries(titles)) {
     "  X-Content-Type-Options: nosniff",
     "  X-Frame-Options: DENY",
     "  Referrer-Policy: no-referrer",
-    "  Content-Security-Policy: default-src 'self'; script-src 'self' " + hash(script) +
-      "; style-src " + hash(style) + "; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; connect-src 'none'; font-src 'none'",
+    "  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()",
+    "  Cross-Origin-Opener-Policy: same-origin",
+    "  Content-Security-Policy: default-src 'none'; script-src " + hash(script) +
+      "; style-src " + hash(style) + "; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+    "",
+    "/data.js",
+    "  Content-Type: application/json; charset=utf-8",
     ""
   ].join("\n");
-  const data = emptyDataMarker + "\nwindow.EXAM_DATA = " + JSON.stringify({ sets: [], questions: [], config }, null, 2) + ";\n";
+  const data = JSON.stringify({
+    _generatedBy: emptyDataMarker,
+    sets: [],
+    questions: [],
+    config: { bookName: config.bookName, bookStatus: config.bookStatus }
+  }, null, 2) + "\n";
   const folder = "sites/" + slug + "/";
   await Promise.all([
     emit(folder + "index.html", html),

@@ -387,7 +387,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const formatDate = (date) => date.replaceAll("-", "/");
     if (!next) {
       const previous = dates.at(-1);
-      $("exam-status").textContent = CONFIG.scheduleNote ? "受験地・種類別の日程" : "次回の試験日程は未確認";
+      $("exam-status").textContent = CONFIG.scheduleNote
+        ? (CONFIG.scheduleTitle ?? "受験地・種類別の日程")
+        : "次回の試験日程は未確認";
       $("exam-date").textContent = CONFIG.scheduleNote ||
         (previous ? "直近の公式日程 " + formatDate(previous.end || previous.date) : "");
       return;

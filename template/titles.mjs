@@ -156,6 +156,7 @@ export const titles = {
     theme: "#8c6a2f",
     fields: fields("再開発に係る法律等", "都市計画法等関連法規", "不動産関連法規", "評価・補償", "実技（事業計画・権利変換）"),
     exams: [],
+    scheduleTitle: "試験日程",
     scheduleNote: "試験は年1回です。日程は年度ごとに実施団体が公表します。",
     passLine: "2026年度実績　学科・実技とも科目基準点以上、かつ合計121点以上（200点満点）",
     sources: [

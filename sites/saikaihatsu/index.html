@@ -226,6 +226,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   ],
   "exams": [],
+  "scheduleTitle": "試験日程",
   "scheduleNote": "試験は年1回です。日程は年度ごとに実施団体が公表します。",
   "passLine": "2026年度実績　学科・実技とも科目基準点以上、かつ合計121点以上（200点満点）",
   "sources": [
@@ -376,7 +377,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const formatDate = (date) => date.replaceAll("-", "/");
     if (!next) {
       const previous = dates.at(-1);
-      $("exam-status").textContent = CONFIG.scheduleNote ? "受験地・種類別の日程" : "次回の試験日程は未確認";
+      $("exam-status").textContent = CONFIG.scheduleNote
+        ? (CONFIG.scheduleTitle ?? "受験地・種類別の日程")
+        : "次回の試験日程は未確認";
       $("exam-date").textContent = CONFIG.scheduleNote ||
         (previous ? "直近の公式日程 " + formatDate(previous.end || previous.date) : "");
       return;

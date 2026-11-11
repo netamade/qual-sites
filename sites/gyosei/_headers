@@ -1,0 +1,5 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-gN4VnkI533p+DtyJWxU/dF8EALhnwGbaUA1pcHjsLD0='; style-src 'sha256-EsbCOAcxmJT+RE3f5UO+2U9onh868n7ydzlguW5sp4I='; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; connect-src 'none'; font-src 'none'

@@ -1,0 +1,10 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()
+  Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-eSFY3QgxkuRgXgNf/UscQL7nzdidM0p7pX9zSDWey7c='; style-src 'sha256-wv0UkEHphiHidbbRySHeP3n6XYr2h4TAkRmIqpcoJL0='; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+
+/data.js
+  Content-Type: application/json; charset=utf-8

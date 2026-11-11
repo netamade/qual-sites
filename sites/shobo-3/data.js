@@ -3,7 +3,7 @@
   "sets": [],
   "questions": [],
   "config": {
-    "bookName": "消防設備士シリーズ オリジナル問題集",
+    "bookName": "消防設備士 第3類 オリジナル問題集",
     "bookStatus": "書籍は発刊準備中"
   }
 }

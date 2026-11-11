@@ -45,7 +45,7 @@ async function emit(file, expected, preserveData = false) {
 }
 
 for (const [slug, settings] of Object.entries(titles)) {
-  if (!/^[a-z]+$/.test(slug) || !/^#[0-9a-f]{6}$/i.test(settings.theme)) {
+  if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(slug) || !/^#[0-9a-f]{6}$/i.test(settings.theme)) {
     throw new Error("Invalid slug or theme: " + slug);
   }
   const config = {

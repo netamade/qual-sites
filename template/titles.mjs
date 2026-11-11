@@ -12,6 +12,24 @@ const gyosei = "https://www.gyosei-shiken.or.jp/doc/guide/guide.html";
 const denko = "https://www.shiken.or.jp/construction/second/";
 const shobo = "https://www.shoubo-shiken.or.jp/shoubou/";
 const denkoSchedule = "https://www.shiken.or.jp/ecee-overview/news/upload/";
+const planner = "https://www.urca.or.jp/planner/";
+
+const shoboSettings = {
+  theme: "#913f36",
+  exams: [],
+  scheduleNote: "試験日は都道府県・受験する種類により異なります。",
+  sources: [
+    ["都道府県別の試験案内", shobo],
+    ["試験科目", shobo + "annai/subject.html"],
+    ["合格基準", shobo + "annai/way.html"]
+  ]
+};
+
+const shoboNumberedSettings = {
+  ...shoboSettings,
+  fields: fields("消防関係法令", "基礎的知識", "構造・機能及び工事・整備", "実技（鑑別等・製図）"),
+  passLine: "筆記は各科目40%以上かつ全体60%以上。実技も60%以上"
+};
 
 export const titles = {
   takken: {
@@ -117,22 +135,33 @@ export const titles = {
       ["2026年度上期受験案内", "https://www.shiken.or.jp/construction/upload/r8kamikiannai.pdf"]
     ]
   },
-  shobo: {
-    title: "消防設備士シリーズ",
-    examName: "消防設備士試験",
-    theme: "#913f36",
-    // 甲種特類には実技がない。第1〜7類を類別と形式の組み合わせで表示する。
-    fields: fields("特類・筆記", ...Array.from({ length: 7 }, (_, i) => [
-      `第${i + 1}類・筆記`, `第${i + 1}類・実技`
-    ]).flat()),
-    // 支部・類・甲乙で異なるため、シリーズ共通の単一試験日は設定しない。
+  "shobo-toku": {
+    ...shoboSettings,
+    title: "消防設備士 特類",
+    examName: "消防設備士試験（甲種特類）",
+    fields: fields("消防関係法令", "構造・機能及び工事・整備", "火災及び防火に係る知識"),
+    passLine: "筆記は各科目40%以上かつ全体60%以上（実技なし）"
+  },
+  ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((number) => [
+    `shobo-${number}`,
+    {
+      ...shoboNumberedSettings,
+      title: `消防設備士 第${number}類`,
+      examName: `消防設備士試験（第${number}類）`
+    }
+  ])),
+  saikaihatsu: {
+    title: "再開発プランナー",
+    examName: "再開発プランナー試験",
+    theme: "#8c6a2f",
+    fields: fields("再開発に係る法律等", "都市計画法等関連法規", "不動産関連法規", "評価・補償", "実技（事業計画・権利変換）"),
     exams: [],
-    scheduleNote: "試験日は都道府県・受験する種類により異なります。",
-    passLine: "筆記は各科目40%以上かつ全体60%以上。特類以外は実技も60%以上",
+    scheduleNote: "試験は年1回です。日程は年度ごとに実施団体が公表します。",
+    passLine: "2026年度実績　学科・実技とも科目基準点以上、かつ合計121点以上（200点満点）",
     sources: [
-      ["都道府県別の試験案内", shobo],
-      ["試験科目", shobo + "annai/subject.html"],
-      ["合格基準", shobo + "annai/way.html"]
+      ["試験案内", planner + "test_all.html"],
+      ["試験情報", planner + "test.html"],
+      ["Q&A", planner + "faq.html"]
     ]
   }
 };

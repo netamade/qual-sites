@@ -52,7 +52,8 @@ for (const [slug, settings] of Object.entries(titles)) {
     bookName: settings.title + " オリジナル問題集",
     bookStatus: "書籍は発刊準備中",
     storagePrefix: "book:" + slug + ":",
-    ...settings
+    ...settings,
+    tool: "qual-" + slug
   };
   const configJSON = JSON.stringify(config, null, 2);
   const html = layout
@@ -71,7 +72,7 @@ for (const [slug, settings] of Object.entries(titles)) {
     "  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()",
     "  Cross-Origin-Opener-Policy: same-origin",
     "  Content-Security-Policy: default-src 'none'; script-src " + hash(script) +
-      "; style-src " + hash(style) + "; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "; style-src " + hash(style) + "; connect-src 'self' https://sq-questions-api.sola-labo.workers.dev; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
     "",
     "/data.js",
     "  Content-Type: application/json; charset=utf-8",

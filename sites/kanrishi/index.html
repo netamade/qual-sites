@@ -240,7 +240,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       "2025年度試験結果",
       "https://www.mankan.org/pdf/R7_goukakusyagaiyo.pdf"
     ]
-  ]
+  ],
+  "tool": "qual-kanrishi"
 };
   const data = await loadData();
   const book = isObject(data?.config) ? data.config : {};
@@ -344,7 +345,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       const legacy = /^window\.EXAM_DATA\s*=\s*/.exec(source);
       if (legacy) source = source.slice(legacy[0].length).replace(/;\s*$/, "");
       const parsed = JSON.parse(source);
-      return isObject(parsed) ? parsed : null;
+      if (!isObject(parsed)) return null;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      try {
+        const apiResponse = await fetch(
+          "https://sq-questions-api.sola-labo.workers.dev/v1/tools/" + encodeURIComponent(fallbackConfig.tool) + "/questions",
+          { credentials: "omit", redirect: "error", signal: controller.signal }
+        );
+        if (apiResponse.ok) {
+          const apiData = await apiResponse.json();
+          if (Array.isArray(apiData?.questions) && apiData.questions.length > 0) {
+            return { ...parsed, questions: apiData.questions };
+          }
+        }
+      } catch {
+        // API の失敗・タイムアウト時は data.js の問題を使う。
+      } finally {
+        clearTimeout(timeout);
+      }
+      return parsed;
     } catch {
       return null;
     }

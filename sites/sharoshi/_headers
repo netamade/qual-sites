@@ -4,7 +4,7 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-D1DvbW6qYMMm8LkqVQpfll7LP3C8JkMwAOvUbwt98EY='; style-src 'sha256-a7vu2uHa7VfhTao/2X0Rw8xPJbzDOCWrEqArRPGCZho='; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-pKqoJ08EoEvgEppkfGqVWLGn9w+nCfUS13AEB66xShU='; style-src 'sha256-a7vu2uHa7VfhTao/2X0Rw8xPJbzDOCWrEqArRPGCZho='; connect-src 'self' https://sq-questions-api.sola-labo.workers.dev; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
 
 /data.js
   Content-Type: application/json; charset=utf-8

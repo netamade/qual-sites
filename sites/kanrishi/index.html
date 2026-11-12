@@ -346,28 +346,85 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (legacy) source = source.slice(legacy[0].length).replace(/;\s*$/, "");
       const parsed = JSON.parse(source);
       if (!isObject(parsed)) return null;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      try {
-        const apiResponse = await fetch(
-          "https://sq-questions-api.sola-labo.workers.dev/v1/tools/" + encodeURIComponent(fallbackConfig.tool) + "/questions",
-          { credentials: "omit", redirect: "error", signal: controller.signal }
-        );
-        if (apiResponse.ok) {
-          const apiData = await apiResponse.json();
-          if (Array.isArray(apiData?.questions) && apiData.questions.length > 0) {
-            return { ...parsed, questions: apiData.questions };
+      const accessKey = fallbackConfig.storagePrefix + "v1:accessCode";
+      let code = "";
+      try { code = text(localStorage.getItem(accessKey)); } catch { /* 保存不可でも入力できる。 */ }
+      let rejected = false;
+      while (true) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        let locked = false;
+        let questionCount = 0;
+        try {
+          const apiResponse = await fetch(
+            "https://sq-questions-api.sola-labo.workers.dev/v1/tools/" + encodeURIComponent(fallbackConfig.tool) + "/questions",
+            { credentials: "omit", redirect: "error", signal: controller.signal,
+              headers: code ? { "X-Access-Code": code } : {} }
+          );
+          if (apiResponse.status === 401) {
+            locked = true;
+            try { localStorage.removeItem(accessKey); } catch { /* 保存不可でも再入力できる。 */ }
+            const body = await apiResponse.json();
+            if (Number.isSafeInteger(body?.questionCount) && body.questionCount >= 0) {
+              questionCount = body.questionCount;
+            }
+          } else if (apiResponse.ok) {
+            const apiData = await apiResponse.json();
+            if (code) {
+              try { localStorage.setItem(accessKey, code); } catch { /* 今回の練習は継続する。 */ }
+            }
+            if (Array.isArray(apiData?.questions) && apiData.questions.length > 0) {
+              return { ...parsed, questions: apiData.questions };
+            }
           }
+        } catch {
+          // API の失敗・タイムアウト時は data.js の問題を使う。
+        } finally {
+          clearTimeout(timeout);
         }
-      } catch {
-        // API の失敗・タイムアウト時は data.js の問題を使う。
-      } finally {
-        clearTimeout(timeout);
+        if (!locked) break;
+        code = await requestAccessCode(questionCount, rejected || Boolean(code));
+        rejected = true;
       }
       return parsed;
     } catch {
       return null;
+    } finally {
+      document.getElementById("access-gate")?.remove();
+      document.getElementById("modes").hidden = false;
     }
+  }
+
+  function requestAccessCode(questionCount, rejected) {
+    document.getElementById("modes").hidden = true;
+    document.getElementById("practice-notice").hidden = true;
+    document.getElementById("access-gate")?.remove();
+    const form = node("form", "", "card");
+    form.id = "access-gate";
+    const label = node("label", "認証コード");
+    label.htmlFor = "access-code";
+    const input = node("input");
+    input.id = "access-code";
+    input.type = "password";
+    input.autocomplete = "off";
+    input.required = true;
+    const submit = node("button", "表示する", "btn primary");
+    submit.type = "submit";
+    const message = node("p", rejected ? "コードが違います" : "");
+    message.setAttribute("role", "status");
+    form.append(node("p", "このサイトには " + questionCount + "問 の問題があります。書籍に記載の認証コードを入力してください"),
+      label, input, submit, message);
+    document.getElementById("practice").append(form);
+    input.focus();
+    return new Promise((resolve) => {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (submit.disabled || !input.value.trim()) return;
+        submit.disabled = true;
+        input.disabled = true;
+        resolve(input.value.trim());
+      });
+    });
   }
 
   function list(value) {

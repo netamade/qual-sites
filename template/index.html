@@ -110,6 +110,17 @@
     .feedback ul, .feedback ol { padding-left: 1.5em; }
     .feedback li { margin-block: 7px; overflow-wrap: anywhere; }
     .quiz .actions { margin-top: 14px; }
+    .qfeedback { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .qfeedback > .actions { margin-top: 0; }
+    .fb-status { font-size: .9rem; }
+    .correction { margin-top: 12px; display: grid; gap: 10px; justify-items: start; }
+    .correction label { font-weight: 700; }
+    .correction textarea {
+      width: 100%; min-height: 96px; padding: 9px; font: inherit; color: var(--ink);
+      background: white; border: 1px solid #80918a; border-radius: 8px;
+    }
+    .correction p { font-size: .9rem; }
+    .pv-beacon { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     .fb-mark{width:84px;height:84px;display:block;margin:0 auto 8px;animation:fb-pop .25s ease-out}
     .fb-batsu{width:64px;height:64px}
     @keyframes fb-pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
@@ -196,5 +207,6 @@
   <script>
 {{ENGINE}}
   </script>
+  <img class="pv-beacon" src="https://sq-feedback-api.sola-labo.workers.dev/v1/pv?site={{TOOL}}" width="1" height="1" alt="" aria-hidden="true">
 </body>
 </html>

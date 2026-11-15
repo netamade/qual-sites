@@ -60,6 +60,7 @@ for (const [slug, settings] of Object.entries(titles)) {
     .replace("{{PAGE_TITLE}}", () => htmlText(config.title + " | 書籍連動 練習サイト"))
     .replace("{{EXAM_TITLE}}", () => htmlText(config.title))
     .replace("{{THEME}}", () => config.theme)
+    .replace("{{TOOL}}", () => config.tool)
     .replace("{{ENGINE}}", () => engine.trimEnd().replace("/* TITLE_CONFIG */ null",
       () => configJSON.replaceAll("<", "\\u003c")));
   const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -72,7 +73,10 @@ for (const [slug, settings] of Object.entries(titles)) {
     "  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()",
     "  Cross-Origin-Opener-Policy: same-origin",
     "  Content-Security-Policy: default-src 'none'; script-src " + hash(script) +
-      "; style-src " + hash(style) + "; connect-src 'self' https://sq-questions-api.sola-labo.workers.dev; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      " https://challenges.cloudflare.com; style-src " + hash(style) +
+      "; img-src 'self' data: https://sq-feedback-api.sola-labo.workers.dev" +
+      "; connect-src 'self' https://sq-questions-api.sola-labo.workers.dev https://sq-feedback-api.sola-labo.workers.dev https://challenges.cloudflare.com" +
+      "; frame-src https://challenges.cloudflare.com; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
     "",
     "/data.js",
     "  Content-Type: application/json; charset=utf-8",

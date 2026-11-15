@@ -63,7 +63,7 @@ for (const [slug, settings] of Object.entries(titles)) {
     .replace("{{TOOL}}", () => config.tool)
     .replace("{{ENGINE}}", () => engine.trimEnd().replace("/* TITLE_CONFIG */ null",
       () => configJSON.replaceAll("<", "\\u003c")));
-  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => hash(match[1]));
   const style = html.match(/<style>([\s\S]*?)<\/style>/)[1];
   const headers = [
     "/*",
@@ -72,10 +72,10 @@ for (const [slug, settings] of Object.entries(titles)) {
     "  Referrer-Policy: no-referrer",
     "  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()",
     "  Cross-Origin-Opener-Policy: same-origin",
-    "  Content-Security-Policy: default-src 'none'; script-src " + hash(script) +
-      " https://challenges.cloudflare.com; style-src " + hash(style) +
-      "; img-src 'self' data: https://sq-feedback-api.sola-labo.workers.dev" +
-      "; connect-src 'self' https://sq-questions-api.sola-labo.workers.dev https://sq-feedback-api.sola-labo.workers.dev https://challenges.cloudflare.com" +
+    "  Content-Security-Policy: default-src 'none'; script-src " + scripts.join(" ") +
+      " https://challenges.cloudflare.com https://www.googletagmanager.com; style-src " + hash(style) +
+      "; img-src 'self' data: https://sq-feedback-api.sola-labo.workers.dev https://www.google-analytics.com" +
+      "; connect-src 'self' https://sq-questions-api.sola-labo.workers.dev https://sq-feedback-api.sola-labo.workers.dev https://challenges.cloudflare.com https://www.google-analytics.com https://region1.google-analytics.com" +
       "; frame-src https://challenges.cloudflare.com; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
     "",
     "/data.js",

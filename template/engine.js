@@ -161,7 +161,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("modes").hidden = true;
     document.getElementById("practice-notice").hidden = true;
     document.getElementById("access-gate")?.remove();
-    const form = node("form", "", "card");
+    const form = node("form", "", "card gate");
     form.id = "access-gate";
     const label = node("label", "認証コード");
     label.htmlFor = "access-code";

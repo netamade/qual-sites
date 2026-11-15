@@ -110,6 +110,17 @@
     .feedback ul, .feedback ol { padding-left: 1.5em; }
     .feedback li { margin-block: 7px; overflow-wrap: anywhere; }
     .quiz .actions { margin-top: 14px; }
+    .qfeedback { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .qfeedback > .actions { margin-top: 0; }
+    .fb-status { font-size: .9rem; }
+    .correction { margin-top: 12px; display: grid; gap: 10px; justify-items: start; }
+    .correction label { font-weight: 700; }
+    .correction textarea {
+      width: 100%; min-height: 96px; padding: 9px; font: inherit; color: var(--ink);
+      background: white; border: 1px solid #80918a; border-radius: 8px;
+    }
+    .correction p { font-size: .9rem; }
+    .pv-beacon { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
     .fb-mark{width:84px;height:84px;display:block;margin:0 auto 8px;animation:fb-pop .25s ease-out}
     .fb-batsu{width:64px;height:64px}
     @keyframes fb-pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
@@ -195,6 +206,10 @@
   </template>
   <script>
 "use strict";
+// フィードバック受け口API（問題配信APIとは別の Worker。投票・修正依頼・PV の書き込みはここだけ）。
+const FEEDBACK_API = "https://sq-feedback-api.sola-labo.workers.dev";
+// 修正依頼フォームの Turnstile サイトキー。空の間はフォームに「現在、受付を準備中です」と表示し、送信できない。
+const TURNSTILE_SITE_KEY = "";
 document.addEventListener("DOMContentLoaded", async () => {
   const fallbackConfig = {
   "bookName": "消防設備士 第4類 オリジナル問題集",
@@ -823,6 +838,206 @@ document.addEventListener("DOMContentLoaded", async () => {
     return feedback;
   }
 
+  const feedbackCounts = new Map();
+  let turnstileReady = null;
+
+  async function feedbackRequest(path, options = {}) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      return await fetch(FEEDBACK_API + path, {
+        credentials: "omit", redirect: "error", signal: controller.signal, ...options
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  function votedKind(questionId) {
+    const value = storage.read("feedback:" + questionId);
+    return value === "good" || value === "bad" ? value : null;
+  }
+
+  function loadTurnstile() {
+    if (window.turnstile) return Promise.resolve(window.turnstile);
+    if (!turnstileReady) {
+      turnstileReady = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        script.addEventListener("load", () => {
+          if (window.turnstile) resolve(window.turnstile);
+          else reject(new Error("Turnstile is unavailable."));
+        });
+        script.addEventListener("error", () => reject(new Error("Turnstile failed to load.")));
+        document.head.append(script);
+      });
+    }
+    return turnstileReady;
+  }
+
+  function makeFeedback(question) {
+    const box = node("section", "", "qfeedback");
+    box.setAttribute("aria-label", "この問題への評価と修正依頼");
+    const row = node("div", "", "actions");
+    const good = button("👍 Good", () => sendVote("good"), "btn");
+    const bad = button("👎 Bad", () => sendVote("bad"), "btn");
+    const open = button("内容修正を依頼", () => {
+      form.hidden = !form.hidden;
+      if (!form.hidden) prepareForm();
+    }, "btn");
+    const status = node("span", "", "fb-status muted");
+    status.setAttribute("role", "status");
+    row.append(good, bad, open, status);
+    box.append(row);
+
+    const form = node("form", "", "correction");
+    form.hidden = true;
+    const label = node("label", "修正してほしい内容を書いてください（1000字まで）");
+    label.htmlFor = "correction-body";
+    const textarea = node("textarea");
+    textarea.id = "correction-body";
+    textarea.maxLength = 1000;
+    textarea.required = true;
+    const widgetBox = node("div");
+    const submit = node("button", "送信する", "btn primary");
+    submit.type = "submit";
+    const formMessage = node("p", "", "muted");
+    formMessage.setAttribute("role", "status");
+    form.append(label, textarea, widgetBox, submit, formMessage);
+    box.append(form);
+
+    let widgetId = null;
+    let token = "";
+    if (!TURNSTILE_SITE_KEY) {
+      textarea.disabled = true;
+      submit.disabled = true;
+      formMessage.textContent = "現在、受付を準備中です。";
+    } else {
+      // Turnstile の確認が済むまでは送信できない。
+      submit.disabled = true;
+    }
+
+    async function prepareForm() {
+      if (!TURNSTILE_SITE_KEY || widgetId !== null || widgetBox.dataset.state) return;
+      widgetBox.dataset.state = "loading";
+      try {
+        const turnstile = await loadTurnstile();
+        widgetId = turnstile.render(widgetBox, {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (value) => {
+            token = value;
+            submit.disabled = false;
+          },
+          "expired-callback": () => {
+            token = "";
+            submit.disabled = true;
+          },
+          "error-callback": () => {
+            token = "";
+            submit.disabled = true;
+          }
+        });
+        widgetBox.dataset.state = "ready";
+      } catch {
+        widgetBox.dataset.state = "error";
+        formMessage.textContent = "確認用の部品を読み込めませんでした。時間をおいてお試しください。";
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const body = textarea.value.trim();
+      if (!body || !token || submit.disabled) return;
+      submit.disabled = true;
+      formMessage.textContent = "送信しています…";
+      try {
+        const response = await feedbackRequest("/v1/corrections", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tool: CONFIG.tool, question_id: question.id, body, turnstile_token: token
+          })
+        });
+        if (response.ok) {
+          formMessage.textContent = "修正依頼を送りました。ありがとうございます。";
+          textarea.value = "";
+          textarea.disabled = true;
+          return;
+        }
+        formMessage.textContent = response.status === 503
+          ? "現在、受付を準備中です。"
+          : response.status === 429
+            ? "送信回数の上限に達しました。時間をおいてお試しください。"
+            : "送信できませんでした。内容を確認して、もう一度お試しください。";
+      } catch {
+        formMessage.textContent = "送信できませんでした。通信状態を確認してください。";
+      }
+      // Turnstile のトークンは使い切りなので、失敗時はリセットして再確認してもらう。
+      token = "";
+      if (widgetId !== null && window.turnstile) {
+        try {
+          window.turnstile.reset(widgetId);
+        } catch {
+          // リセットできない場合は次の描画で作り直す。
+        }
+      }
+    });
+
+    function paint() {
+      const counts = feedbackCounts.get(question.id);
+      good.textContent = "👍 Good" + (counts ? " " + counts.good : "");
+      bad.textContent = "👎 Bad" + (counts ? " " + counts.bad : "");
+      const voted = votedKind(question.id);
+      good.disabled = Boolean(voted);
+      bad.disabled = Boolean(voted);
+      good.setAttribute("aria-pressed", String(voted === "good"));
+      bad.setAttribute("aria-pressed", String(voted === "bad"));
+    }
+
+    async function sendVote(kind) {
+      if (votedKind(question.id)) return;
+      good.disabled = true;
+      bad.disabled = true;
+      status.textContent = "";
+      try {
+        const response = await feedbackRequest("/v1/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tool: CONFIG.tool, question_id: question.id, kind })
+        });
+        if (!response.ok) throw new Error("Vote was rejected.");
+        const data = await response.json();
+        if (Number.isSafeInteger(data?.good) && Number.isSafeInteger(data?.bad)) {
+          feedbackCounts.set(question.id, { good: data.good, bad: data.bad });
+        }
+        storage.write("feedback:" + question.id, kind);
+        status.textContent = "評価を送りました。ありがとうございます。";
+      } catch {
+        status.textContent = "評価を送信できませんでした。";
+      }
+      paint();
+    }
+
+    paint();
+    if (!feedbackCounts.has(question.id)) {
+      feedbackRequest("/v1/feedback/counts?tool=" + encodeURIComponent(CONFIG.tool) +
+          "&question_id=" + encodeURIComponent(question.id))
+        .then(async (response) => {
+          if (!response.ok) return;
+          const data = await response.json();
+          if (Number.isSafeInteger(data?.good) && Number.isSafeInteger(data?.bad)) {
+            feedbackCounts.set(question.id, { good: data.good, bad: data.bad });
+            paint();
+          }
+        })
+        .catch(() => {
+          // 件数が取得できなくても、問題表示と回答操作はそのまま使える。
+        });
+    }
+    return box;
+  }
+
   function renderQuiz(focusHeading = false) {
     const { session } = active;
     const quiz = $("quiz");
@@ -907,6 +1122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       card.append(feedback, actions);
       if (!focusHeading) feedback.focus();
     }
+    card.append(makeFeedback(question));
     if (focusHeading) heading.focus();
   }
 
@@ -968,5 +1184,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   showHome();
 });
   </script>
+  <img class="pv-beacon" src="https://sq-feedback-api.sola-labo.workers.dev/v1/pv?site=qual-shobo-4" width="1" height="1" alt="" aria-hidden="true">
 </body>
 </html>

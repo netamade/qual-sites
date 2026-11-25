@@ -123,6 +123,13 @@
     .quiz-heading { margin: 0 0 12px; display: inline-block; }
     #book-heading { display: inline-block; }
     .quiz-meta { display: flex; flex-wrap: wrap; gap: 4px 15px; margin-top: 8px; color: var(--muted); font-size: .88rem; }
+    .quiz-meta > span { min-width: 0; overflow-wrap: anywhere; }
+    .difficulty-stars { white-space: nowrap; }
+    .difficulty-filled { color: var(--orange); }
+    .difficulty-empty { color: #777; }
+    .published-rate { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+    .rate-meter { flex: 0 0 64px; width: 64px; height: 8px; overflow: hidden; border-radius: 4px; background: #ddd; }
+    .rate-meter-fill { display: block; height: 100%; background: var(--orange); }
     progress { width: 100%; height: 12px; accent-color: var(--orange); }
     .stem, .explanation-text { white-space: pre-wrap; overflow-wrap: anywhere; }
     .stem { margin: 16px 0; font-size: 1.16rem; font-weight: 800; }
@@ -1122,13 +1129,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     const labels = [
       (session.position + 1) + " / " + session.items.length + " 問",
       fields.get(question.field)?.name ?? question.fieldName, question.setTitle, question.theme,
-      "正答率（自分） " + rate, "難易度 " + (question.difficulty ?? "未設定")
+      "正答率（自分） " + rate
     ];
+    meta.append(...labels.filter(Boolean).map((label) => node("span", label)));
+    const difficulty = node("span", "難易度 ");
+    if (Number.isInteger(question.difficulty) && question.difficulty >= 1 && question.difficulty <= 3) {
+      difficulty.setAttribute("aria-label", "難易度 " + question.difficulty + " / 3");
+      const stars = node("span", "", "difficulty-stars");
+      stars.setAttribute("aria-hidden", "true");
+      stars.append(node("span", "★".repeat(question.difficulty), "difficulty-filled"),
+        node("span", "☆".repeat(3 - question.difficulty), "difficulty-empty"));
+      difficulty.append(stars);
+    } else {
+      difficulty.append(String(question.difficulty ?? "未設定"));
+    }
+    meta.append(difficulty);
     if (question.publishedRate != null) {
       const published = question.publishedRate;
-      labels.push("正答率（出題データ） " + (typeof published === "number" ? published + "%" : published));
+      const label = node("span", "正答率（出題データ） " + (typeof published === "number" ? published + "%" : published), "published-rate");
+      if (Number.isFinite(published)) {
+        const meter = node("span", "", "rate-meter");
+        meter.setAttribute("aria-hidden", "true");
+        const fill = node("span", "", "rate-meter-fill");
+        fill.style.width = Math.max(0, Math.min(100, published)) + "%";
+        meter.append(fill);
+        label.append(meter);
+      }
+      meta.append(label);
     }
-    meta.append(...labels.filter(Boolean).map((label) => node("span", label)));
     card.append(progress, meta, node("p", item.option == null ? question.stem : question.options[item.option - 1], "stem"));
     if (item.option != null) {
       const details = node("details", "", "details");

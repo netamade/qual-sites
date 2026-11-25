@@ -4,7 +4,7 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-Es8DkBpuYJzfjd9Dwm6TkpZXm2IayO94iYbbSfCcc3c=' 'sha256-8gQeF0EFa0xNJFWX0HF4CXp93A9zWnsUkl+JDDqzOHA=' https://challenges.cloudflare.com https://www.googletagmanager.com; style-src 'sha256-pSjYVqTbmtUfD/Xlvd2BTRB5mqhewhhGZCYQWnUIvmo='; img-src 'self' data: https://sq-feedback-api.sola-labo.workers.dev https://www.google-analytics.com; connect-src 'self' https://sq-questions-api.sola-labo.workers.dev https://sq-feedback-api.sola-labo.workers.dev https://challenges.cloudflare.com https://www.google-analytics.com https://region1.google-analytics.com; frame-src https://challenges.cloudflare.com; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-Es8DkBpuYJzfjd9Dwm6TkpZXm2IayO94iYbbSfCcc3c=' 'sha256-e5dPnhRuVxoZ4joDB0rIKYJzMyaLLuuF6cWj+FHK/7U=' https://challenges.cloudflare.com https://www.googletagmanager.com; style-src 'sha256-AhbXAIwpNraBvdgcwXh6spzCNIlVAS03QA7SrtJLge4='; img-src 'self' data: https://sq-feedback-api.sola-labo.workers.dev https://www.google-analytics.com; connect-src 'self' https://sq-questions-api.sola-labo.workers.dev https://sq-feedback-api.sola-labo.workers.dev https://challenges.cloudflare.com https://www.google-analytics.com https://region1.google-analytics.com; frame-src https://challenges.cloudflare.com; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
 
 /data.js
   Content-Type: application/json; charset=utf-8
